@@ -194,7 +194,7 @@ function run(){
 }
 
 const clip=(s,n)=>{s=s.replace(/\s+/g," ").trim();if(s.length<=n)return s;const c=s.slice(0,n),i=c.lastIndexOf(" ");return c.slice(0,i>n*.6?i:n)+"…"};
-const PROV={anthropic:{n:"Anthropic (Claude)",m:"claude-sonnet-5-5"},gemini:{n:"Google Gemini",m:"gemini-2.5-flash"},deepseek:{n:"DeepSeek",m:"deepseek-chat",u:"https://api.deepseek.com"},groq:{n:"Groq",m:"llama-3.3-70b-versatile",u:"https://api.groq.com/openai/v1"},openrouter:{n:"OpenRouter",m:"",u:"https://openrouter.ai/api/v1"},openai:{n:"OpenAI",m:"gpt-4o-mini",u:"https://api.openai.com/v1"}};
+const PROV={anthropic:{n:"Anthropic (Claude)",m:"claude-sonnet-5-5"},gemini:{n:"Google Gemini",m:"gemini-2.5-flash"},deepseek:{n:"DeepSeek",m:"deepseek-chat",u:"https://api.deepseek.com"},groq:{n:"Groq",m:"openai/gpt-oss-120b",u:"https://api.groq.com/openai/v1"},openrouter:{n:"OpenRouter",m:"",u:"https://openrouter.ai/api/v1"},openai:{n:"OpenAI",m:"gpt-4o-mini",u:"https://api.openai.com/v1"}};
 function getCfg(){try{return JSON.parse(localStorage.getItem("aicfg")||"null")||{}}catch(e){return {}}}
 function saveCfg(c){try{c.k?localStorage.setItem("aicfg",JSON.stringify(c)):localStorage.removeItem("aicfg")}catch(e){}}
 async function aiSummary(q){
