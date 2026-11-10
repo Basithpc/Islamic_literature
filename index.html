@@ -194,8 +194,10 @@ function run(){
 }
 
 const clip=(s,n)=>{s=s.replace(/\s+/g," ").trim();if(s.length<=n)return s;const c=s.slice(0,n),i=c.lastIndexOf(" ");return c.slice(0,i>n*.6?i:n)+"…"};
-const PROV={anthropic:{n:"Anthropic (Claude)",m:"claude-sonnet-5-5"},gemini:{n:"Google Gemini",m:"gemini-2.5-flash"},deepseek:{n:"DeepSeek",m:"deepseek-chat",u:"https://api.deepseek.com"},groq:{n:"Groq",m:"openai/gpt-oss-120b",u:"https://api.groq.com/openai/v1"},openrouter:{n:"OpenRouter",m:"",u:"https://openrouter.ai/api/v1"},openai:{n:"OpenAI",m:"gpt-4o-mini",u:"https://api.openai.com/v1"}};
-function getCfg(){try{return JSON.parse(localStorage.getItem("aicfg")||"null")||{}}catch(e){return {}}}
+// Built-in AI settings (Groq). Edit or delete this line to change or remove the key.
+const DEFAULT_CFG={p:"groq",k:"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",m:"openai/gpt-oss-120b",u:""};
+const PROV={anthropic:{n:"Anthropic (Claude)",m:"claude-sonnet-5-5"},gemini:{n:"Google Gemini",m:"gemini-2.5-flash"},deepseek:{n:"DeepSeek",m:"deepseek-chat",u:"https://api.deepseek.com"},groq:{n:"Groq",m:"llama-3.3-70b-versatile",u:"https://api.groq.com/openai/v1"},openrouter:{n:"OpenRouter",m:"",u:"https://openrouter.ai/api/v1"},openai:{n:"OpenAI",m:"gpt-4o-mini",u:"https://api.openai.com/v1"}};
+function getCfg(){try{return JSON.parse(localStorage.getItem("aicfg")||"null")||DEFAULT_CFG}catch(e){return DEFAULT_CFG}}
 function saveCfg(c){try{c.k?localStorage.setItem("aicfg",JSON.stringify(c)):localStorage.removeItem("aicfg")}catch(e){}}
 async function aiSummary(q){
  const out=$("aitxt"),btn=$("aibtn"),c=getCfg(),P=PROV[c.p];btn.disabled=true;out.textContent="Writing summary…";
@@ -211,7 +213,7 @@ async function aiSummary(q){
    res=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent?key="+encodeURIComponent(c.k),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
    d=await res.json();if(res.ok)text=((d.candidates||[])[0]?.content?.parts||[]).map(x=>x.text||"").join("");
   }else{
-   res=await fetch((c.u||P.u).replace(/\/$/,"")+"/chat/completions",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+c.k},body:JSON.stringify({model,max_tokens:700,messages:[{role:"user",content:prompt}]})});
+   res=await fetch((c.u||P.u).replace(/\/$/,"")+"/chat/completions",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+c.k},body:JSON.stringify(Object.assign({model,max_tokens:1500,messages:[{role:"user",content:prompt}]},/gpt-oss/.test(model)?{reasoning_effort:"low"}:{}))});
    d=await res.json();if(res.ok)text=d.choices?.[0]?.message?.content||"";
   }
   if(!res.ok)throw new Error((d.error&&(d.error.message||d.error))||("HTTP "+res.status));
