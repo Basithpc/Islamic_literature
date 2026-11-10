@@ -22,6 +22,10 @@ h1{font-size:22px;margin:0;font-weight:650;letter-spacing:-.01em}
 #ask[disabled]{opacity:.5}
 #q{padding-right:96px}
 .tm{font-size:12px;color:var(--mu);border:1px dashed var(--bd);border-radius:999px;padding:2px 9px}
+#sum{background:var(--panel);border:1px solid var(--ac);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+#sum .sh{font-size:12px;color:var(--ac);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+#sum .sh span{color:var(--mu);font-weight:400;text-transform:none;letter-spacing:0;margin-left:8px}
+#sum .sb2{white-space:pre-wrap}#sum ul{margin:8px 0 10px;padding-left:18px;color:#b4b9be}#sum li{margin-bottom:5px}#sum .act{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}#aitxt{margin-top:10px}#aiset{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}#aiset[hidden]{display:none}#aiset select,#aiset input{background:var(--bg);border:1px solid var(--bd);color:var(--tx);border-radius:8px;padding:7px 9px;font-size:13px;min-width:150px;flex:1}#aiset .hint{flex-basis:100%;font-size:12px;color:var(--mu)}
 #q::placeholder{color:#5d646b}
 #sum{background:var(--panel);border:1px solid var(--ac);border-radius:12px;padding:14px 16px;margin-bottom:14px}
 #sum .sh{font-size:12px;color:var(--ac);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
@@ -69,7 +73,7 @@ footer{color:var(--mu);font-size:12px;padding:0 0 30px}
 <main>
  <aside id="side"><h2 id="th">Sections</h2><input id="tf" placeholder="Filter sections…"><div id="tl"></div></aside>
  <section><div id="info"><span id="itxt">Starting…</span><span><button class="chip" id="tbtn">Sections</button> <button id="clr" hidden>Clear section</button></span></div>
- <div id="res"></div><button id="more" hidden>Show more</button></section>
+ <div id="sum" hidden></div><div id="res"></div><button id="more" hidden>Show more</button></section>
 </main>
 <footer>Arabic originals; English is a modern translation (Saheeh International for the Quran). Data: open-source fawazahmed0/quran-api and hadith-api. Verify against a trusted print edition.</footer>
 </div>
@@ -186,7 +190,52 @@ function run(){
  const q=$("q").value.trim();
  hits=rank(q);shown=0;$("res").innerHTML="";
  $("itxt").textContent=hits.length.toLocaleString()+(q?(hits.length>=400?"+ results, best matches first":" results, best matches first"):" entries")+(sel?" in "+books[sel[0]].top[sel[1]][0]:"");
- $("clr").hidden=!sel;terms();more();
+ $("clr").hidden=!sel;terms();more();overview();
+}
+
+const clip=(s,n)=>{s=s.replace(/\s+/g," ").trim();if(s.length<=n)return s;const c=s.slice(0,n),i=c.lastIndexOf(" ");return c.slice(0,i>n*.6?i:n)+"…"};
+const PROV={anthropic:{n:"Anthropic (Claude)",m:"claude-sonnet-5-5"},gemini:{n:"Google Gemini",m:"gemini-2.5-flash"},deepseek:{n:"DeepSeek",m:"deepseek-chat",u:"https://api.deepseek.com"},groq:{n:"Groq",m:"llama-3.3-70b-versatile",u:"https://api.groq.com/openai/v1"},openrouter:{n:"OpenRouter",m:"",u:"https://openrouter.ai/api/v1"},openai:{n:"OpenAI",m:"gpt-4o-mini",u:"https://api.openai.com/v1"}};
+function getCfg(){try{return JSON.parse(localStorage.getItem("aicfg")||"null")||{}}catch(e){return {}}}
+function saveCfg(c){try{c.k?localStorage.setItem("aicfg",JSON.stringify(c)):localStorage.removeItem("aicfg")}catch(e){}}
+async function aiSummary(q){
+ const out=$("aitxt"),btn=$("aibtn"),c=getCfg(),P=PROV[c.p];btn.disabled=true;out.textContent="Writing summary…";
+ const ps=hits.slice(0,12).map(([i,k])=>{const b=books[i],r=b.rec[k];return "["+b.name+" "+r[0]+"] "+r[2].slice(0,450)}).join("\n\n");
+ const prompt='Question: "'+q.replace(/"/g,"'")+'"\n\nPassages (English translations from the Quran, Sahih al-Bukhari and Sahih Muslim):\n'+ps+'\n\nWrite a brief, neutral summary (3 to 6 sentences) answering the question using ONLY these passages. Cite sources in square brackets, for example [Quran 17:23]. If the passages cover different aspects or do not answer the question directly, say so plainly. Add no rulings or facts that are not in the passages. Plain text, no markdown.';
+ const model=c.m||P.m;let text="";
+ try{
+  let res,d;
+  if(c.p=="anthropic"){
+   res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":c.k,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model,max_tokens:700,messages:[{role:"user",content:prompt}]})});
+   d=await res.json();if(res.ok)text=(d.content||[]).map(x=>x.text||"").join("");
+  }else if(c.p=="gemini"){
+   res=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent?key="+encodeURIComponent(c.k),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
+   d=await res.json();if(res.ok)text=((d.candidates||[])[0]?.content?.parts||[]).map(x=>x.text||"").join("");
+  }else{
+   res=await fetch((c.u||P.u).replace(/\/$/,"")+"/chat/completions",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+c.k},body:JSON.stringify({model,max_tokens:700,messages:[{role:"user",content:prompt}]})});
+   d=await res.json();if(res.ok)text=d.choices?.[0]?.message?.content||"";
+  }
+  if(!res.ok)throw new Error((d.error&&(d.error.message||d.error))||("HTTP "+res.status));
+  if($("q").value.trim()!==q)return;
+  out.textContent=(text.trim()||"(empty answer)")+"\n\n(AI-written from the top results. Check the sources; this is not a religious ruling.)";
+ }catch(e){out.textContent="Couldn't get a summary: "+(e instanceof TypeError?"the request was blocked or failed. The provider may not allow direct browser calls, or you may be offline. Try another provider.":e.message)}
+ btn.disabled=false;
+}
+function overview(){
+ const box=$("sum"),q=$("q").value.trim();
+ if(!q||!hits.length){box.hidden=true;return}
+ const top=hits.slice(0,60),cnt={},sec={};
+ top.forEach(([i,k])=>{const b=books[i],s=b.top[b.rec[k][3]][0];cnt[b.name]=(cnt[b.name]||0)+1;sec[s]=(sec[s]||0)+1});
+ const secs=Object.entries(sec).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]);
+ const srcs=Object.entries(cnt).map(x=>x[0]+" ("+x[1]+")").join(", ");
+ const pts=hits.slice(0,5).map(([i,k])=>{const b=books[i],r=b.rec[k];return "<li><b>"+esc(b.name+" "+r[0])+"</b> — "+esc(clip(r[2],230))+"</li>"}).join("");
+ const c=getCfg(),has=c.k&&PROV[c.p];
+ box.hidden=false;
+ box.innerHTML='<div class="sh">Overview<span>built from the best matches, no AI</span></div><div class="sb2">The best '+top.length+' matches come from '+esc(srcs)+'. Most relevant sections: '+esc(secs.join("; "))+'.</div><ul>'+pts+'</ul><div class="act">'+(has?'<button class="chip" id="aibtn">Write AI summary ('+esc(PROV[c.p].n)+')</button>':"")+'<button class="chip" id="keybtn">'+(has?"AI settings":"Set up AI summary (free keys work)")+'</button></div><div id="aiset" hidden><select id="aip">'+Object.entries(PROV).map(([k,v])=>'<option value="'+k+'">'+v.n+'</option>').join("")+'</select><input id="aik" type="password" placeholder="API key"><input id="aim" placeholder="Model name"><input id="aiu" placeholder="Base URL (OpenAI-compatible only)"><button class="chip" id="aisave">Save</button><div class="hint">Stored only in this browser. Sent only to the provider you pick. Model names change over time, so edit the model if a provider says it is unknown. Leave the key empty and Save to remove it.</div></div><div id="aitxt" class="sb2"></div>';
+ const sync=()=>{const p=$("aip").value;$("aim").placeholder="Model (default "+(PROV[p].m||"required")+")";$("aiu").style.display=PROV[p].u?"":"none";$("aiu").placeholder="Base URL (default "+(PROV[p].u||"")+")"};
+ $("aip").value=c.p&&PROV[c.p]?c.p:"gemini";$("aik").value=c.k||"";$("aim").value=c.m||"";$("aiu").value=c.u||"";sync();$("aip").onchange=sync;
+ $("keybtn").onclick=()=>{$("aiset").hidden=!$("aiset").hidden};
+ $("aisave").onclick=()=>{saveCfg({p:$("aip").value,k:$("aik").value.trim(),m:$("aim").value.trim(),u:$("aiu").value.trim()});overview()};
+ if(has)$("aibtn").onclick=()=>aiSummary(q);
 }
 let askSeq=0;
 function smart(){clearTimeout(timer);run()}
